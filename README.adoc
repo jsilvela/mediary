@@ -4,8 +4,28 @@ v0.5, 2014-07-11
 
 Mediary is a tool to write and store events into a machine-readable format.
 
-== Overview
+== Usage
 Events have three attributes: time, tags, text.
+Usage:
+ go run mediary.go <optional file>
+
+Mediary goes into listening mode. It reads from stdin line by line.
+Lines can be:
+ time: <my time>
+with the time either "today", or in the format "2014-01-30"
+ tags: <my tags>
+accepting a comma-separated list
+ text: <my text>
+almost anything is possible. The program goes into text mode, which allows multi-line text.
+ ===
+This will signal that the text mode is finished.
+ ***
+This signals we're done with the current record, and want to define a new one.
+ ====
+Finish and write the file.
+
+== Motivation
+I've been keeping a notebook with health-related events, which has been pretty useful. I want to transition it to files, but plain text means that any reporting would be done with regex or similar. I'd like a good way to ask questions, and I think a SQL db is too heavy-weight. Hence this project.
 
 == Details
 Concept version coded in +go+ (this is my first program). Uses JSON for storage.

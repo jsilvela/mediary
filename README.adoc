@@ -1,0 +1,12 @@
+= Mediary
+Jaime Silvela
+v0.5, 2014-07-11
+
+Mediary is a tool to write and store events into a machine-readable format.
+
+== Overview
+Events have three attributes: time, tags, text.
+
+== Details
+Concept version coded in +go+ (this is my first program). Uses JSON for storage.
+Currently very much a CLI, but eventually would be nice to have this in iOS.

@@ -6,18 +6,26 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
 
 type Record struct {
-	Time time.Time
-	Tags []string
-	Text string
+	EventTime   time.Time
+	WrittenTime time.Time
+	Tags        []string
+	Text        string
 }
 
+type Diary []*Record
+
+func (a Diary) Len() int           { return len(a) }
+func (a Diary) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a Diary) Less(i, j int) bool { return a[i].WrittenTime.Before(a[j].EventTime) }
+
 func (r *Record) String() string {
-	y, m, d := r.Time.Date()
+	y, m, d := r.EventTime.Date()
 	return fmt.Sprintf("t: %d-%d-%d\ntags: %s\ntext: %s\n", y, m, d, r.Tags, r.Text)
 }
 
@@ -40,21 +48,19 @@ func main() {
 
 	var filename string
 	if len(os.Args) < 2 {
-		filename = "./testing"
+		filename = "./mediary.txt"
 	} else {
 		filename = os.Args[1]
 	}
 
 	bytes, _ := ioutil.ReadFile(filename)
-	var reqs []*Record
+	var reqs Diary
 	err := json.Unmarshal(bytes, &reqs)
-	fmt.Println()
-	fmt.Println("**** Re-reading")
-	if err == nil {
-		for _, v := range reqs {
-			fmt.Println(v)
-		}
-	}
+	check(err)
+
+	fmt.Println("\n**** Last entry")
+	sort.Stable(reqs)
+	fmt.Println(reqs[len(reqs)-1])
 	fmt.Println("**** DONE. Read from:")
 	fmt.Println(filename)
 
@@ -64,11 +70,11 @@ func main() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "***" {
-			reqs = append(reqs, record)
+			addToDiary(&reqs, record)
 			record = new(Record)
 		} else if line == "====" {
 			if record.Text != "" {
-				reqs = append(reqs, record)
+				addToDiary(&reqs, record)
 				fmt.Println("Stored last record")
 			}
 			fmt.Println("Wrote records")
@@ -111,6 +117,11 @@ func main() {
 	}
 }
 
+func addToDiary(a *Diary, r *Record) {
+	r.WrittenTime = time.Now()
+	*a = append(*a, r)
+}
+
 func processText(line string, record *Record, state *ParserState) {
 	if line == "===" {
 		*state = Null
@@ -127,10 +138,10 @@ func processText(line string, record *Record, state *ParserState) {
 func processTime(line string, record *Record, state *ParserState) {
 	const shortForm = "2006-01-02"
 	if strings.TrimSpace(line) == "today" {
-		record.Time = time.Now()
+		record.EventTime = time.Now()
 	} else {
 		t, _ := time.Parse(shortForm, strings.TrimSpace(line))
-		record.Time = t
+		record.EventTime = t
 	}
 }
 

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"time"
-	"encoding/json"
-	"os"
-	"io/ioutil"
 	"bufio"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
+	"time"
 )
 
 type Record struct {
@@ -17,8 +17,8 @@ type Record struct {
 }
 
 func (r *Record) String() string {
-	y, m, d :=  r.Time.Date()
-	return fmt.Sprintf("t: %d-%d-%d\ntags: %s\ntext: %s\n",y, m, d, r.Tags, r.Text)
+	y, m, d := r.Time.Date()
+	return fmt.Sprintf("t: %d-%d-%d\ntags: %s\ntext: %s\n", y, m, d, r.Tags, r.Text)
 }
 
 func check(e error) {
@@ -28,8 +28,9 @@ func check(e error) {
 }
 
 type ParserState int
+
 const (
-	Text ParserState =iota
+	Text ParserState = iota
 	Tags
 	Time
 	Null
@@ -43,20 +44,20 @@ func main() {
 	} else {
 		filename = os.Args[1]
 	}
-	
+
 	bytes, _ := ioutil.ReadFile(filename)
-	var reqs  []*Record
+	var reqs []*Record
 	err := json.Unmarshal(bytes, &reqs)
 	fmt.Println()
 	fmt.Println("**** Re-reading")
-	if err==nil {
+	if err == nil {
 		for _, v := range reqs {
 			fmt.Println(v)
 		}
 	}
 	fmt.Println("**** DONE. Read from:")
 	fmt.Println(filename)
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null
 	record := new(Record)
@@ -80,7 +81,7 @@ func main() {
 			frag := strings.SplitN(line, ":", 2)
 			if len(frag) == 2 {
 				switch {
-				case  frag[0] == "time":
+				case frag[0] == "time":
 					processTime(frag[1], record, &state)
 				case frag[0] == "tags":
 					processTags(frag[1], record, &state)
@@ -128,7 +129,7 @@ func processTime(line string, record *Record, state *ParserState) {
 	if strings.TrimSpace(line) == "today" {
 		record.Time = time.Now()
 	} else {
-		t, _:= time.Parse(shortForm, strings.TrimSpace(line))
+		t, _ := time.Parse(shortForm, strings.TrimSpace(line))
 		record.Time = t
 	}
 }
@@ -136,9 +137,8 @@ func processTime(line string, record *Record, state *ParserState) {
 func processTags(line string, record *Record, state *ParserState) {
 	frags := strings.Split(line, ",")
 	tags := make([]string, len(frags))
-	for i:=0; i<len(frags); i++ {
+	for i := 0; i < len(frags); i++ {
 		tags[i] = strings.TrimSpace(frags[i])
 	}
 	record.Tags = tags
 }
-	

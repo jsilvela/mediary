@@ -22,7 +22,7 @@ type Diary []*Record
 
 func (a Diary) Len() int           { return len(a) }
 func (a Diary) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a Diary) Less(i, j int) bool { return a[i].WrittenTime.Before(a[j].EventTime) }
+func (a Diary) Less(i, j int) bool { return a[i].WrittenTime.Before(a[j].WrittenTime) }
 
 func (r *Record) String() string {
 	y, m, d := r.EventTime.Date()
@@ -46,23 +46,25 @@ const (
 
 func main() {
 
+	var reqs Diary
 	var filename string
+
 	if len(os.Args) < 2 {
 		filename = "./mediary.txt"
 	} else {
 		filename = os.Args[1]
+		bytes, errfile := ioutil.ReadFile(filename)
+		check(errfile)
+		err := json.Unmarshal(bytes, &reqs)
+		check(err)
 	}
 
-	bytes, _ := ioutil.ReadFile(filename)
-	var reqs Diary
-	err := json.Unmarshal(bytes, &reqs)
-	check(err)
 
-	fmt.Println("\n**** Last entry")
-	sort.Stable(reqs)
-	fmt.Println(reqs[len(reqs)-1])
-	fmt.Println("**** DONE. Read from:")
-	fmt.Println(filename)
+	if len(reqs) > 0 {
+		sort.Stable(reqs)
+		fmt.Println("\n**** Latest entry")
+		fmt.Println(reqs[len(reqs)-1])
+	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null

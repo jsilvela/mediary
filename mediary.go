@@ -2,32 +2,13 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"github.com/jsilvela/diary"
 	"os"
 	"sort"
 	"strings"
 	"time"
 )
-
-type Record struct {
-	EventTime   time.Time
-	WrittenTime time.Time
-	Tags        []string
-	Text        string
-}
-
-type Diary []*Record
-
-func (a Diary) Len() int           { return len(a) }
-func (a Diary) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a Diary) Less(i, j int) bool { return a[i].WrittenTime.Before(a[j].WrittenTime) }
-
-func (r *Record) String() string {
-	y, m, d := r.EventTime.Date()
-	return fmt.Sprintf("t: %d-%d-%d\ntags: %s\ntext: %s\n", y, m, d, r.Tags, r.Text)
-}
 
 func check(e error) {
 	if e != nil {
@@ -46,19 +27,17 @@ const (
 
 func main() {
 
-	var reqs Diary
+	var reqs diary.Diary
 	var filename string
 
 	if len(os.Args) < 2 {
 		filename = "./mediary.txt"
 	} else {
 		filename = os.Args[1]
-		bytes, errfile := ioutil.ReadFile(filename)
-		check(errfile)
-		err := json.Unmarshal(bytes, &reqs)
+		diar, err := diary.Read(filename)
 		check(err)
+		reqs = *diar
 	}
-
 
 	if len(reqs) > 0 {
 		sort.Stable(reqs)
@@ -68,22 +47,20 @@ func main() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null
-	record := new(Record)
+	record := new(diary.Record)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "***" {
-			addToDiary(&reqs, record)
-			record = new(Record)
+			(&reqs).AddEntry(record)
+			record = new(diary.Record)
 		} else if line == "====" {
 			if record.Text != "" {
-				addToDiary(&reqs, record)
+				(&reqs).AddEntry(record)
 				fmt.Println("Stored last record")
 			}
 			fmt.Println("Wrote records")
-			mar, err := json.MarshalIndent(reqs, "", "\t")
+			err := diary.Write(filename, reqs)
 			check(err)
-			e := ioutil.WriteFile(filename, mar, 0644)
-			check(e)
 			return
 		} else {
 			frag := strings.SplitN(line, ":", 2)
@@ -119,12 +96,10 @@ func main() {
 	}
 }
 
-func addToDiary(a *Diary, r *Record) {
-	r.WrittenTime = time.Now()
-	*a = append(*a, r)
-}
 
-func processText(line string, record *Record, state *ParserState) {
+
+// Parse text declaration when writing new entry
+func processText(line string, record *diary.Record, state *ParserState) {
 	if line == "===" {
 		*state = Null
 	} else {
@@ -137,7 +112,7 @@ func processText(line string, record *Record, state *ParserState) {
 	}
 }
 
-func processTime(line string, record *Record, state *ParserState) {
+func processTime(line string, record *diary.Record, state *ParserState) {
 	const shortForm = "2006-01-02"
 	if strings.TrimSpace(line) == "today" {
 		record.EventTime = time.Now()
@@ -147,7 +122,7 @@ func processTime(line string, record *Record, state *ParserState) {
 	}
 }
 
-func processTags(line string, record *Record, state *ParserState) {
+func processTags(line string, record *diary.Record, state *ParserState) {
 	frags := strings.Split(line, ",")
 	tags := make([]string, len(frags))
 	for i := 0; i < len(frags); i++ {

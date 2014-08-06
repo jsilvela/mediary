@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/jsilvela/diary"
+	"github.com/jsilvela/diary/filters"
+	"github.com/jsilvela/diary/reports"
 	"os"
 	"sort"
 	"strings"
@@ -47,22 +49,33 @@ func main() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null
-	record := new(diary.Record)
+	var record *diary.Record
+	inRecord := false
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line == "***" {
-			(&reqs).AddEntry(record)
+		if line == "}" && inRecord == true {
+			reqs.AddEntry(record)
+			inRecord = false
+		} else if line == "}" && inRecord == false {
+			fmt.Printf("Closing brace closes nothing\n")
+			continue
+		} else if line == "new {" {
+			if inRecord {
+				fmt.Println("Can't open a new record while we're in a record")
+				continue
+			}
 			record = new(diary.Record)
-		} else if line == "====" {
-			if record.Text != "" {
-				(&reqs).AddEntry(record)
-				fmt.Println("Stored last record")
+			inRecord = true
+		} else if line == "exit" {
+			if inRecord && record.Text != "" {
+				reqs.AddEntry(record)
+				fmt.Println("Stored last unfinished record")
 			}
 			fmt.Println("Wrote records")
 			err := diary.Write(filename, reqs)
 			check(err)
 			return
-		} else {
+		} else if inRecord {
 			frag := strings.SplitN(line, ":", 2)
 			if len(frag) == 2 {
 				switch {
@@ -88,6 +101,12 @@ func main() {
 					continue
 				}
 			}
+		} else {
+			tempD := reqs
+			frags := strings.Split(line, " ")
+			for _, cm := range frags {
+				execute(cm, &tempD)
+			}
 		}
 	}
 
@@ -96,7 +115,19 @@ func main() {
 	}
 }
 
-
+// Execute single line of strung commands
+func execute(command string, d *diary.Diary) {
+	switch command {
+	case "week":
+		*d = *filters.ByWeek(*d)
+	case "tags":
+		fmt.Println(reports.Tags(*d))
+	case "latest":
+		fmt.Println(reports.Latest(*d))
+	default:
+		fmt.Printf("Unrecognized command: %s\n", command)
+	}
+}
 
 // Parse text declaration when writing new entry
 func processText(line string, record *diary.Record, state *ParserState) {

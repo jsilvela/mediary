@@ -7,7 +7,6 @@ import (
 	"github.com/jsilvela/diary/filters"
 	"github.com/jsilvela/diary/reports"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -42,20 +41,30 @@ func main() {
 	}
 
 	if len(reqs) > 0 {
-		sort.Stable(reqs)
-		fmt.Println("\n**** Latest entry")
-		fmt.Println(reqs[len(reqs)-1])
+		w, h := reqs.LatestWritten(), reqs.LatestHappened()
+
+		if w != h {
+			fmt.Println("\n**** Latest written:")
+			fmt.Println(w)
+			fmt.Println("\n\n**** Latest happened:")
+			fmt.Println(h)
+		} else {
+			fmt.Println("\n**** Latest written:")
+			fmt.Println(w)
+		}
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null
 	var record *diary.Record
 	inRecord := false
+	dirty := false
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "}" && inRecord == true {
 			reqs.AddEntry(record)
 			inRecord = false
+			dirty = true
 		} else if line == "}" && inRecord == false {
 			fmt.Printf("Closing brace closes nothing\n")
 			continue
@@ -69,11 +78,16 @@ func main() {
 		} else if line == "exit" {
 			if inRecord && record.Text != "" {
 				reqs.AddEntry(record)
+				dirty = true
 				fmt.Println("Stored last unfinished record")
 			}
-			fmt.Println("Wrote records")
-			err := diary.Write(filename, reqs)
-			check(err)
+			if !dirty {
+				fmt.Println("Unmodified, not saving")
+			} else {
+				err := diary.Write(filename, reqs)
+				check(err)
+				fmt.Println("Wrote records")
+			}
 			return
 		} else if inRecord {
 			frag := strings.SplitN(line, ":", 2)
@@ -123,7 +137,11 @@ func execute(command string, d *diary.Diary) {
 	case "tags":
 		fmt.Println(reports.Tags(*d))
 	case "latest":
-		fmt.Println(reports.Latest(*d))
+		fmt.Println("Latest events of each tag:")
+		lt := reports.Latest(*d)
+		for k, v := range lt {
+			fmt.Printf("%s\t=> %v\n", k, v.Format("Mon 2 Jan 2006"))
+		}
 	default:
 		fmt.Printf("Unrecognized command: %s\n", command)
 	}

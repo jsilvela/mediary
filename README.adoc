@@ -1,5 +1,6 @@
 = Mediary
 Jaime Silvela
+v0.6, 2014-08-08
 v0.5, 2014-07-11
 
 Mediary is a tool to write and store events into a machine-readable format.

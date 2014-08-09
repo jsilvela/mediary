@@ -4,11 +4,20 @@ v0.5, 2014-07-11
 
 Mediary is a tool to write and store events into a machine-readable format.
 
-== Usage
- go run mediary.go <optional file>
+== Installation
+go get github.com/jsilvela/mediary
+go build github.com/jsilvela/mediary
 
-Mediary goes into listening mode. It reads from stdin line by line. +
-Lines can be: +
+== Usage
+mediary <optional file>
+
+Mediary goes into listening mode, reads from stdin line by line. +
+You start a new entry by typing +
+new { +
+and finish with +
+}
+
+In the context of an entry, you can specify the following fields:
 
 time: <my time>:: with the time either "today", or in the format "2014-01-30"
 
@@ -16,13 +25,15 @@ tags: <my tags>:: accepting a comma-separated list
 
 text: <my text>:: the program goes into text mode, which allows multi-line text.
 
-<free text>:: see previous entry. Free text acceptable only if we're in text mode.
+Outside of the context of an entry, each line is seen as a full and final sentence, 
+containing some filters, and a reporting directive. +
+Filters: week +
+Reports: tags, latest +
 
-===:: End text mode.
+For example, a line could be: week latest
 
-\***:: Save current record, start a new one.
-
-====:: Save new records into the file, and exit.
+To finish your session, +
+exit
 
 == Motivation
 I've been keeping a notebook with health-related events, which has been pretty useful. I want to transition it to files, but plain text means that any reporting would be done with regex or similar. I'd like a good way to ask questions, and I think a SQL db is too heavy-weight. Hence this project.

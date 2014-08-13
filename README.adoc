@@ -6,7 +6,7 @@ v0.5, 2014-07-11
 Mediary is a tool to write and store events into a machine-readable format.
 
 == Installation
-go get github.com/jsilvela/mediary
+go get github.com/jsilvela/mediary +
 go build github.com/jsilvela/mediary
 
 == Usage

@@ -6,6 +6,7 @@ import (
 	"github.com/jsilvela/diary"
 	"github.com/jsilvela/diary/filters"
 	"github.com/jsilvela/diary/reports"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -36,7 +37,9 @@ func main() {
 	} else {
 		filename = os.Args[1]
 		diar, err := diary.Read(filename)
-		check(err)
+		if err != nil {
+			log.Fatal(err)
+		}
 		reqs = *diar
 	}
 

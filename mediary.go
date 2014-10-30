@@ -60,26 +60,26 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	state := Null
 	var record *diary.Record
-	inRecord := false
+	in_record := false
 	dirty := false
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line == "}" && inRecord == true {
+		if line == "}" && in_record == true {
 			reqs.Add_entry(record)
-			inRecord = false
+			in_record = false
 			dirty = true
-		} else if line == "}" && inRecord == false {
+		} else if line == "}" && in_record == false {
 			fmt.Printf("Closing brace closes nothing\n")
 			continue
 		} else if line == "new {" {
-			if inRecord {
+			if in_record {
 				fmt.Println("Can't open a new record while we're in a record")
 				continue
 			}
 			record = new(diary.Record)
-			inRecord = true
+			in_record = true
 		} else if line == "exit" {
-			if inRecord && record.Text != "" {
+			if in_record && record.Text != "" {
 				reqs.Add_entry(record)
 				dirty = true
 				fmt.Println("Stored last unfinished record")
@@ -92,7 +92,7 @@ func main() {
 				fmt.Println("Wrote records")
 			}
 			return
-		} else if inRecord {
+		} else if in_record {
 			frag := strings.SplitN(line, ":", 2)
 			if len(frag) == 2 {
 				switch {
@@ -137,6 +137,8 @@ func execute(command string, d *diary.Diary) {
 	switch command {
 	case "week":
 		*d = *filters.By_week(*d)
+	case "month":
+		*d = *filters.By_month(*d)
 	case "tags":
 		fmt.Println(reports.Tags(*d))
 	case "latest":

@@ -17,10 +17,10 @@ func check(e error) {
 	}
 }
 
-type ParserState int
+type Parser_state int
 
 const (
-	Text ParserState = iota
+	Text Parser_state = iota
 	Tags
 	Time
 	Null
@@ -41,7 +41,7 @@ func main() {
 	}
 
 	if len(reqs) > 0 {
-		w, h := reqs.LatestWritten(), reqs.LatestHappened()
+		w, h := reqs.Latest_written(), reqs.Latest_happened()
 
 		if w != h {
 			fmt.Println("\n**** Latest written:")
@@ -62,7 +62,7 @@ func main() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "}" && inRecord == true {
-			reqs.AddEntry(record)
+			reqs.Add_entry(record)
 			inRecord = false
 			dirty = true
 		} else if line == "}" && inRecord == false {
@@ -77,7 +77,7 @@ func main() {
 			inRecord = true
 		} else if line == "exit" {
 			if inRecord && record.Text != "" {
-				reqs.AddEntry(record)
+				reqs.Add_entry(record)
 				dirty = true
 				fmt.Println("Stored last unfinished record")
 			}
@@ -94,14 +94,14 @@ func main() {
 			if len(frag) == 2 {
 				switch {
 				case frag[0] == "time":
-					processTime(frag[1], record, &state)
+					process_time(frag[1], record, &state)
 				case frag[0] == "tags":
-					processTags(frag[1], record, &state)
+					process_tags(frag[1], record, &state)
 				case frag[0] == "text":
-					processText(frag[1], record, &state)
+					process_text(frag[1], record, &state)
 				default:
 					if state == Text {
-						processText(line, record, &state)
+						process_text(line, record, &state)
 					} else {
 						fmt.Printf("Invalid tag: %s\n", frag[0])
 						continue
@@ -109,7 +109,7 @@ func main() {
 				}
 			} else {
 				if state == Text {
-					processText(line, record, &state)
+					process_text(line, record, &state)
 				} else {
 					fmt.Println("Invalid. Key must be supplied")
 					continue
@@ -133,7 +133,7 @@ func main() {
 func execute(command string, d *diary.Diary) {
 	switch command {
 	case "week":
-		*d = *filters.ByWeek(*d)
+		*d = *filters.By_week(*d)
 	case "tags":
 		fmt.Println(reports.Tags(*d))
 	case "latest":
@@ -148,7 +148,7 @@ func execute(command string, d *diary.Diary) {
 }
 
 // Parse text declaration when writing new entry
-func processText(line string, record *diary.Record, state *ParserState) {
+func process_text(line string, record *diary.Record, state *Parser_state) {
 	if line == "===" {
 		*state = Null
 	} else {
@@ -161,17 +161,17 @@ func processText(line string, record *diary.Record, state *ParserState) {
 	}
 }
 
-func processTime(line string, record *diary.Record, state *ParserState) {
+func process_time(line string, record *diary.Record, state *Parser_state) {
 	const shortForm = "2006-01-02"
 	if strings.TrimSpace(line) == "today" {
-		record.EventTime = time.Now()
+		record.Event_time = time.Now()
 	} else {
 		t, _ := time.Parse(shortForm, strings.TrimSpace(line))
-		record.EventTime = t
+		record.Event_time = t
 	}
 }
 
-func processTags(line string, record *diary.Record, state *ParserState) {
+func process_tags(line string, record *diary.Record, state *Parser_state) {
 	frags := strings.Split(line, ",")
 	tags := make([]string, len(frags))
 	for i := 0; i < len(frags); i++ {

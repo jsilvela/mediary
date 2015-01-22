@@ -121,12 +121,12 @@ func main() {
 }
 
 type func_cells struct {
-	f func(diary.Diary) *diary.Diary
+	f    func(diary.Diary) *diary.Diary
 	next *func_cells
 }
 
 type report_cell struct {
-	f func(diary.Diary) []string
+	f   func(diary.Diary) []string
 	arg string
 }
 
@@ -157,7 +157,7 @@ func parse_script_line(frags []string) (*func_cells, *report_cell) {
 				rep := reports.Latest(d)
 				out := make([]string, len(rep))
 				i := 0
-				for tag, t := range(rep) {
+				for tag, t := range rep {
 					out[i] = fmt.Sprintf("%s\t=> %v\n",
 						tag, (*t).Format("Mon 2 Jan 2006"))
 					i++

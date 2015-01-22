@@ -110,9 +110,8 @@ func main() {
 		} else {
 			diary_copy := reqs
 			frags := strings.Split(line, " ")
-			for _, command := range frags {
-				execute(command, &diary_copy)
-			}
+			fs, rep := parse_script_line(frags)
+			eval_script(diary_copy, fs, rep)
 		}
 	}
 
@@ -121,23 +120,66 @@ func main() {
 	}
 }
 
-// Execute single line of strung commands
-func execute(command string, d *diary.Diary) {
-	switch command {
-	case "week":
-		*d = *filters.By_week(*d)
-	case "month":
-		*d = *filters.By_month(*d)
-	case "tags":
-		fmt.Println(reports.Tags(*d))
-	case "latest":
-		fmt.Println("Latest events of each tag:")
-		lt := reports.Latest(*d)
-		for k, v := range lt {
-			fmt.Printf("%s\t=> %v\n", k, v.Format("Mon 2 Jan 2006"))
+type func_cells struct {
+	f func(diary.Diary) *diary.Diary
+	next *func_cells
+}
+
+type report_cell struct {
+	f func(diary.Diary) []string
+	arg string
+}
+
+func parse_script_line(frags []string) (*func_cells, *report_cell) {
+	var funcs *func_cells
+	var rep *report_cell
+
+	for len(frags) > 0 {
+		switch frags[0] {
+		case "week":
+			funcs = &func_cells{filters.By_week, funcs}
+			frags = frags[1:]
+		case "month":
+			funcs = &func_cells{filters.By_month, funcs}
+			frags = frags[1:]
+		case "by-tag":
+			tag := frags[1]
+			by_tag := func(d diary.Diary) *diary.Diary {
+				return filters.By_tag(d, tag)
+			}
+			funcs = &func_cells{by_tag, funcs}
+			frags = frags[2:]
+		case "tags":
+			rep = &report_cell{reports.Tags, ""}
+			frags = frags[1:]
+		case "latest":
+			latest := func(d diary.Diary) []string {
+				rep := reports.Latest(d)
+				out := make([]string, len(rep))
+				i := 0
+				for tag, t := range(rep) {
+					out[i] = fmt.Sprintf("%s\t=> %v\n",
+						tag, (*t).Format("Mon 2 Jan 2006"))
+					i++
+				}
+				return out
+			}
+			rep = &report_cell{latest, ""}
+			frags = frags[1:]
+		default:
+			fmt.Printf("Unrecognized command: %s\n", frags[0])
+			return nil, nil
 		}
-	default:
-		fmt.Printf("Unrecognized command: %s\n", command)
+	}
+
+	return funcs, rep
+}
+
+func eval_script(d diary.Diary, fs *func_cells, rep *report_cell) {
+	if fs != nil {
+		eval_script(*fs.f(d), fs.next, rep)
+	} else if rep != nil {
+		fmt.Println(rep.f(d))
 	}
 }
 

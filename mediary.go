@@ -152,6 +152,9 @@ func parse_script_line(frags []string) (*func_cells, *report_cell) {
 		case "tags":
 			rep = &report_cell{reports.Tags, ""}
 			frags = frags[1:]
+		case "series":
+			rep = &report_cell{reports.Time_series, ""}
+			frags = frags[1:]
 		case "latest":
 			latest := func(d diary.Diary) []string {
 				rep := reports.Latest(d)

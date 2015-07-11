@@ -12,12 +12,6 @@ import (
 	"time"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 func main() {
 
 	var reqs diary.Diary
@@ -27,91 +21,98 @@ func main() {
 		filename = "./mediary.txt"
 	} else {
 		filename = os.Args[1]
-		diar, err := diary.Read(filename)
+		var err error
+		reqs, err = diary.Read(filename)
 		if err != nil {
 			log.Fatal(err)
 		}
-		reqs = *diar
 	}
 
 	if len(reqs) > 0 {
-		w, h := reqs.Latest_written(), reqs.Latest_happened()
-		if w != h {
-			fmt.Println("\n**** Latest written:\n%s\n\n**** Latest happened:\n%\n", w, h)
+		w, h := reqs.LatestWritten(), reqs.LatestHappened()
+		if w.WrittenTime != h.WrittenTime {
+			fmt.Printf("\n**** Latest written:\n%s\n\n**** Latest happened:\n%s\n",
+				w, h)
 		} else {
-			fmt.Println("\n**** Latest written:\n%s\n", w)
+			fmt.Printf("\n**** Latest written:\n%s\n", h)
 		}
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	in_text := false
-	var record *diary.Record
-	out_of_sync := false
+	inText := false
+	var record, nullrec diary.Record
+	dirty := false
+	inrec := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
-		} else if line == "}" && record != nil {
-			reqs.Add_entry(record)
-			record = nil
-			in_text = false
-			out_of_sync = true
-		} else if line == "}" && record == nil {
+		} else if line == "}" && inrec {
+			reqs.AddEntry(record)
+			record = nullrec
+			inText = false
+			dirty = true
+			inrec = false
+		} else if line == "}" {
 			fmt.Printf("Closing brace closes nothing\n")
 			continue
 		} else if line == "new {" || line == "new{" {
-			if record != nil {
+			if inrec {
 				fmt.Println("Can't open a new record while we're" +
 					" in a record")
 				continue
 			}
-			record = new(diary.Record)
+			inrec = true
 		} else if line == "exit" {
-			if record != nil && record.Text != "" {
-				reqs.Add_entry(record)
-				out_of_sync = true
-				fmt.Println("Adding last unfinished record")
+			if inrec {
+				fmt.Println("Can't exit while writing a record")
+				continue
 			}
-			if out_of_sync {
+			if dirty {
 				err := diary.Write(filename, reqs)
-				check(err)
-				fmt.Println("Wrote records")
+				if err != nil {
+					fmt.Println(err)
+				} else {
+					fmt.Println("Wrote records")
+				}
 			} else {
 				fmt.Println("Unmodified, not saving")
 			}
 			return
-		} else if record != nil {
+		} else if inrec {
 			frag := strings.SplitN(line, ":", 2)
 			if len(frag) == 2 {
 				sel, content := frag[0], frag[1]
 				switch {
 				case sel == "time":
-					process_time(content, record)
+					if !processTime(content, &record) {
+						fmt.Printf("Date not understood: %s\n", content)
+					}
 				case sel == "tags":
-					process_tags(content, record)
+					processTags(content, &record)
 				case sel == "text":
-					in_text = process_text(content, record)
+					inText = processText(content, &record)
 				default:
-					if in_text {
-						in_text = process_text(line, record)
+					if inText {
+						inText = processText(line, &record)
 					} else {
 						fmt.Printf("Invalid tag: %s\n", sel)
 						continue
 					}
 				}
 			} else {
-				if in_text {
-					in_text = process_text(line, record)
+				if inText {
+					inText = processText(line, &record)
 				} else {
 					fmt.Println("Invalid. Key must be supplied")
 					continue
 				}
 			}
 		} else {
-			diary_copy := reqs
+			diaryCopy := reqs
 			frags := strings.Split(line, " ")
-			fs, rep := parse_script_line(frags)
-			eval_script(diary_copy, fs, rep)
+			fs, rep := parseScript(frags)
+			evalScript(diaryCopy, fs, rep)
 		}
 	}
 
@@ -120,40 +121,40 @@ func main() {
 	}
 }
 
-type func_cells struct {
+type funcCells struct {
 	f    func(diary.Diary) *diary.Diary
-	next *func_cells
+	next *funcCells
 }
 
-type report_cell struct {
+type reportCell struct {
 	f   func(diary.Diary) []string
 	arg string
 }
 
-func parse_script_line(frags []string) (*func_cells, *report_cell) {
-	var funcs *func_cells
-	var rep *report_cell
+func parseScript(frags []string) (*funcCells, *reportCell) {
+	var funcs *funcCells
+	var rep *reportCell
 
 	for len(frags) > 0 {
 		switch frags[0] {
 		case "week":
-			funcs = &func_cells{filters.By_week, funcs}
+			funcs = &funcCells{filters.ByWeek, funcs}
 			frags = frags[1:]
 		case "month":
-			funcs = &func_cells{filters.By_month, funcs}
+			funcs = &funcCells{filters.ByMonth, funcs}
 			frags = frags[1:]
 		case "by-tag":
 			tag := frags[1]
-			by_tag := func(d diary.Diary) *diary.Diary {
-				return filters.By_tag(d, tag)
+			byTag := func(d diary.Diary) *diary.Diary {
+				return filters.ByTag(d, tag)
 			}
-			funcs = &func_cells{by_tag, funcs}
+			funcs = &funcCells{byTag, funcs}
 			frags = frags[2:]
 		case "tags":
-			rep = &report_cell{reports.Tags, ""}
+			rep = &reportCell{reports.Tags, ""}
 			frags = frags[1:]
 		case "series":
-			rep = &report_cell{reports.Time_series, ""}
+			rep = &reportCell{reports.TimeSeries, ""}
 			frags = frags[1:]
 		case "latest":
 			latest := func(d diary.Diary) []string {
@@ -162,12 +163,12 @@ func parse_script_line(frags []string) (*func_cells, *report_cell) {
 				i := 0
 				for tag, t := range rep {
 					out[i] = fmt.Sprintf("%s\t=> %v\n",
-						tag, (*t).Format("Mon 2 Jan 2006"))
+						tag, t.Format("Mon 2 Jan 2006"))
 					i++
 				}
 				return out
 			}
-			rep = &report_cell{latest, ""}
+			rep = &reportCell{latest, ""}
 			frags = frags[1:]
 		default:
 			fmt.Printf("Unrecognized command: %s\n", frags[0])
@@ -178,39 +179,43 @@ func parse_script_line(frags []string) (*func_cells, *report_cell) {
 	return funcs, rep
 }
 
-func eval_script(d diary.Diary, fs *func_cells, rep *report_cell) {
+func evalScript(d diary.Diary, fs *funcCells, rep *reportCell) {
 	if fs != nil {
-		eval_script(*fs.f(d), fs.next, rep)
+		evalScript(*fs.f(d), fs.next, rep)
 	} else if rep != nil {
 		fmt.Println(rep.f(d))
 	}
 }
 
 // Parse text declaration when writing new entry
-func process_text(line string, record *diary.Record) bool {
+func processText(line string, record *diary.Record) bool {
 	if line == "===" {
 		return false
+	}
+	if record.Text == "" {
+		record.Text = strings.TrimSpace(line)
 	} else {
-		if record.Text == "" {
-			record.Text = strings.TrimSpace(line)
-		} else {
-			record.Text = strings.Join([]string{record.Text, "\n", line}, "")
+		record.Text = strings.Join([]string{record.Text, "\n", line}, "")
+	}
+	return true
+}
+
+func processTime(line string, record *diary.Record) bool {
+	const shortForm = "2006-01-02"
+	if strings.TrimSpace(line) == "today" {
+		record.EventTime = time.Now()
+		return true
+	} else {
+		t, err := time.Parse(shortForm, strings.TrimSpace(line))
+		if err != nil {
+			return false
 		}
+		record.EventTime = t
 		return true
 	}
 }
 
-func process_time(line string, record *diary.Record) {
-	const shortForm = "2006-01-02"
-	if strings.TrimSpace(line) == "today" {
-		record.Event_time = time.Now()
-	} else {
-		t, _ := time.Parse(shortForm, strings.TrimSpace(line))
-		record.Event_time = t
-	}
-}
-
-func process_tags(line string, record *diary.Record) {
+func processTags(line string, record *diary.Record) {
 	frags := strings.Split(line, ",")
 	tags := make([]string, len(frags))
 	for i := 0; i < len(frags); i++ {

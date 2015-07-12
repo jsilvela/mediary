@@ -1,0 +1,15 @@
+digraph G {
+    graph [rankdir=LR, fontsize=10, margin=0.001];
+    top[shape=box];
+    text[shape=box];
+    record[shape=box];
+    exit[shape=ellipse];
+    top -> record [label="new {\nnew{"];
+    record -> text [label="text:<text>"]
+    record -> record [label="tags:<xxx>\ntime:<yyy>"]
+    text -> text [label="<text>"]
+	text -> record [label="tags:<xxx>\ntime:<yyy>"]
+    text -> top [label="}"];
+    record -> top [label="}"]
+    top -> exit [label="exit\nquit"]
+}

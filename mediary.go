@@ -12,8 +12,106 @@ import (
 	"time"
 )
 
-func main() {
+type status struct {
+	text     string
+	time     time.Time
+	tags     []string
+	filename string
+	diar     diary.Diary
+	dirty    bool
+}
 
+type state func(s *status, line string) state
+
+func parseTop(s *status, line string) state {
+	log.Println("TOP")
+	if line == "" {
+		return parseTop
+	} else if line == "new {" || line == "new{" {
+		return parseRecord
+	} else if line == "exit" || line == "quit" {
+		if s.dirty {
+			err := diary.Write(s.filename, s.diar)
+			if err != nil {
+				log.Println(err)
+				return parseTop
+			} else {
+				log.Println("Wrote records")
+				return nil
+			}
+		} else {
+			log.Println("Unmodified, not saving")
+			return nil
+		}
+	} else {
+		diaryCopy := s.diar
+		frags := strings.Split(line, " ")
+		fs, rep := parseScript(frags)
+		evalScript(diaryCopy, fs, rep)
+		return parseTop
+	}
+}
+
+func parseText(s *status, line string) state {
+	log.Println("TEXT")
+	switch {
+	case line == "===":
+		return parseRecord
+	case line == "}" :
+		newrec := diary.Record{EventTime: s.time, Tags: s.tags, Text: s.text}
+		(&(s.diar)).AddEntry(newrec)
+		s.dirty = true
+		return parseTop
+	case strings.HasPrefix(line, "tags:"):
+		return parseRecord(s, line)
+	case strings.HasPrefix(line, "time:"):
+		return parseRecord(s, line)
+	case s.text == "":
+		s.text = strings.TrimSpace(line)
+	default:
+		s.text = s.text + "\n" + line
+	}
+	return parseText
+}
+
+func parseRecord(s *status, line string) state {
+	log.Println("RECORD")
+	frag := strings.SplitN(line, ":", 2)
+	if len(frag) == 2 {
+		sel, content := frag[0], strings.TrimSpace(frag[1])
+		switch {
+		case sel == "time":
+			t, err := processTime(content)
+			if err != nil {
+				log.Printf("Date not understood: %s\n%s\n", content, err)
+				return parseRecord
+			}
+			s.time = t
+		case sel == "tags":
+			frags := strings.Split(content, ",")
+			tags := make([]string, len(frags))
+			for i := 0; i < len(frags); i++ {
+				tags[i] = strings.TrimSpace(frags[i])
+			}
+			s.tags = tags
+		case sel == "text":
+			return parseText(s, content)
+		default:
+			log.Printf("Invalid tag: %s\n", sel)
+		}
+		return parseRecord
+	} else if line == "}" {
+		newrec := diary.Record{EventTime: s.time, Tags: s.tags, Text: s.text}
+		(&(s.diar)).AddEntry(newrec)
+		s.dirty = true
+		return parseTop
+	} else {
+		log.Printf("Unexpected input while buildging record: %s\n", line)
+		return parseTop
+	}
+}
+
+func main() {
 	var reqs diary.Diary
 	var filename string
 
@@ -31,93 +129,25 @@ func main() {
 	if len(reqs) > 0 {
 		w, h := reqs.LatestWritten(), reqs.LatestHappened()
 		if w.WrittenTime != h.WrittenTime {
-			fmt.Printf("\n**** Latest written:\n%s\n\n**** Latest happened:\n%s\n",
+			log.Printf("\n**** Latest written:\n%s\n\n**** Latest happened:\n%s\n",
 				w, h)
 		} else {
-			fmt.Printf("\n**** Latest written:\n%s\n", h)
+			log.Printf("\n**** Latest written:\n%s\n", h)
 		}
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	inText := false
-	var record, nullrec diary.Record
-	dirty := false
-	inrec := false
+	parse := parseTop
+	s := status{diar: reqs, filename: filename}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		} else if line == "}" && inrec {
-			reqs.AddEntry(record)
-			record = nullrec
-			inText = false
-			dirty = true
-			inrec = false
-		} else if line == "}" {
-			fmt.Printf("Closing brace closes nothing\n")
-			continue
-		} else if line == "new {" || line == "new{" {
-			if inrec {
-				fmt.Println("Can't open a new record while we're" +
-					" in a record")
-				continue
-			}
-			inrec = true
-		} else if line == "exit" {
-			if inrec {
-				fmt.Println("Can't exit while writing a record")
-				continue
-			}
-			if dirty {
-				err := diary.Write(filename, reqs)
-				if err != nil {
-					fmt.Println(err)
-				} else {
-					fmt.Println("Wrote records")
-				}
-			} else {
-				fmt.Println("Unmodified, not saving")
-			}
-			return
-		} else if inrec {
-			frag := strings.SplitN(line, ":", 2)
-			if len(frag) == 2 {
-				sel, content := frag[0], frag[1]
-				switch {
-				case sel == "time":
-					if !processTime(content, &record) {
-						fmt.Printf("Date not understood: %s\n", content)
-					}
-				case sel == "tags":
-					processTags(content, &record)
-				case sel == "text":
-					inText = processText(content, &record)
-				default:
-					if inText {
-						inText = processText(line, &record)
-					} else {
-						fmt.Printf("Invalid tag: %s\n", sel)
-						continue
-					}
-				}
-			} else {
-				if inText {
-					inText = processText(line, &record)
-				} else {
-					fmt.Println("Invalid. Key must be supplied")
-					continue
-				}
-			}
-		} else {
-			diaryCopy := reqs
-			frags := strings.Split(line, " ")
-			fs, rep := parseScript(frags)
-			evalScript(diaryCopy, fs, rep)
+		parse = parse(&s, line)
+		if parse == nil {
+			break
 		}
 	}
-
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, "reading standard input:", err)
+		log.Println("reading standard input:", err)
 	}
 }
 
@@ -171,7 +201,7 @@ func parseScript(frags []string) (*funcCells, *reportCell) {
 			rep = &reportCell{latest, ""}
 			frags = frags[1:]
 		default:
-			fmt.Printf("Unrecognized command: %s\n", frags[0])
+			log.Printf("Unrecognized command: %s\n", frags[0])
 			return nil, nil
 		}
 	}
@@ -183,43 +213,20 @@ func evalScript(d diary.Diary, fs *funcCells, rep *reportCell) {
 	if fs != nil {
 		evalScript(*fs.f(d), fs.next, rep)
 	} else if rep != nil {
-		fmt.Println(rep.f(d))
+		log.Println(rep.f(d))
 	}
 }
 
-// Parse text declaration when writing new entry
-func processText(line string, record *diary.Record) bool {
-	if line == "===" {
-		return false
-	}
-	if record.Text == "" {
-		record.Text = strings.TrimSpace(line)
-	} else {
-		record.Text = strings.Join([]string{record.Text, "\n", line}, "")
-	}
-	return true
-}
-
-func processTime(line string, record *diary.Record) bool {
+func processTime(line string) (time.Time, error) {
 	const shortForm = "2006-01-02"
 	if strings.TrimSpace(line) == "today" {
-		record.EventTime = time.Now()
-		return true
+		return time.Now(), nil
 	} else {
 		t, err := time.Parse(shortForm, strings.TrimSpace(line))
 		if err != nil {
-			return false
+			return t, err
+		} else {
+			return t, nil
 		}
-		record.EventTime = t
-		return true
 	}
-}
-
-func processTags(line string, record *diary.Record) {
-	frags := strings.Split(line, ",")
-	tags := make([]string, len(frags))
-	for i := 0; i < len(frags); i++ {
-		tags[i] = strings.TrimSpace(frags[i])
-	}
-	record.Tags = tags
 }

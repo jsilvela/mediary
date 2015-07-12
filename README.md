@@ -6,7 +6,7 @@ go get github.com/jsilvela/mediary<br/>
 go build github.com/jsilvela/mediary
 
 ## Usage
-mediary <optional file>
+	> mediary <optional file>
 
 If no file is provided, mediary will create a new one, mediary.txt, in the
 current directory.
@@ -21,7 +21,7 @@ You start a new record by typing<br/>
 ```new {``` or ```new{```<br/>
 and finish with ```}```
 
-In the context of an record, you can specify the following fields:
+In the context of a record, you can specify the following fields:
 
 * ```time: <my time>``` with the time either "today", or in the format
 "2014-01-30"
@@ -49,6 +49,7 @@ reporting would be done with regex or similar. I'd like a good way to ask
 questions, and I think a SQL db is too heavy-weight. Hence this project.
 
 ## Details
-Concept version coded in *go* (this is my first program). Uses JSON for storage.
+Concept version coded in *go* (this is my first Go program). Uses JSON for
+storage.
 Currently very much a CLI, but eventually would be nice to have this in a mobile
 o.s.

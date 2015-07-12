@@ -35,21 +35,18 @@ func parseTop(s *status, line string) state {
 			if err != nil {
 				log.Println(err)
 				return parseTop
-			} else {
-				log.Println("Wrote records")
-				return nil
 			}
-		} else {
-			log.Println("Unmodified, not saving")
+			log.Println("Wrote records")
 			return nil
 		}
-	} else {
-		diaryCopy := s.diar
-		frags := strings.Split(line, " ")
-		fs, rep := parseScript(frags)
-		evalScript(diaryCopy, fs, rep)
-		return parseTop
+		log.Println("Unmodified, not saving")
+		return nil
 	}
+	diaryCopy := s.diar
+	frags := strings.Split(line, " ")
+	fs, rep := parseScript(frags)
+	evalScript(diaryCopy, fs, rep)
+	return parseTop
 }
 
 func parseText(s *status, line string) state {
@@ -57,7 +54,7 @@ func parseText(s *status, line string) state {
 	switch {
 	case line == "===":
 		return parseRecord
-	case line == "}" :
+	case line == "}":
 		newrec := diary.Record{EventTime: s.time, Tags: s.tags, Text: s.text}
 		(&(s.diar)).AddEntry(newrec)
 		s.dirty = true
@@ -221,12 +218,10 @@ func processTime(line string) (time.Time, error) {
 	const shortForm = "2006-01-02"
 	if strings.TrimSpace(line) == "today" {
 		return time.Now(), nil
-	} else {
-		t, err := time.Parse(shortForm, strings.TrimSpace(line))
-		if err != nil {
-			return t, err
-		} else {
-			return t, nil
-		}
 	}
+	t, err := time.Parse(shortForm, strings.TrimSpace(line))
+	if err != nil {
+		return t, err
+	}
+	return t, nil
 }

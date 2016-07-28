@@ -146,9 +146,20 @@ func main() {
 		log.Fatalf("Error reading input lines: %s", err.Error())
 	}
 	if status.dirty {
-		f, err := os.Open(filename)
+		var f *os.File
+		_, err := os.Stat(filename)
 		if err != nil {
-			log.Fatalf("Error opening file for output: %s", err.Error())
+			log.Println("Output file didn't exist. Will create it.", err)
+			f, err = os.Create(filename)
+			if err != nil {
+				log.Fatalf("Error creating output file: %s", err.Error())
+			}
+		} else {
+			log.Println("Appending to existing output file")
+			f, err = os.OpenFile(filename, os.O_RDWR, 0666)
+			if err != nil {
+				log.Fatalf("Error opening output file: %s", err.Error())
+			}
 		}
 		err = diary.Write(f, status.diar)
 		if err != nil {

@@ -13,17 +13,14 @@ import (
 )
 
 type status struct {
-	text   string
-	time   time.Time
-	tags   []string
-	diar   diary.Diary
-	dirty  bool
+	entry diary.Record
+	diar  diary.Diary
+	dirty bool
 }
 
 type state func(s *status, line string) state
 
 func parseTop(s *status, line string) state {
-	log.Println("TOP")
 	if line == "" {
 		return parseTop
 	} else if line == "new {" || line == "new{" {
@@ -39,29 +36,28 @@ func parseTop(s *status, line string) state {
 }
 
 func parseText(s *status, line string) state {
-	log.Println("TEXT")
 	switch {
 	case line == "===":
 		return parseRecord
 	case line == "}":
-		newrec := diary.Record{EventTime: s.time, Tags: s.tags, Text: s.text}
-		(&(s.diar)).AddEntry(newrec)
+		(&(s.diar)).AddEntry(s.entry)
+		s.entry = diary.Record{}
 		s.dirty = true
+		log.Println("New record added to diary")
 		return parseTop
 	case strings.HasPrefix(line, "tags:"):
 		return parseRecord(s, line)
 	case strings.HasPrefix(line, "time:"):
 		return parseRecord(s, line)
-	case s.text == "":
-		s.text = strings.TrimSpace(line)
+	case s.entry.Text == "":
+		s.entry.Text = strings.TrimSpace(line)
 	default:
-		s.text = s.text + "\n" + line
+		s.entry.Text = s.entry.Text + "\n" + line
 	}
 	return parseText
 }
 
 func parseRecord(s *status, line string) state {
-	log.Println("RECORD")
 	frag := strings.SplitN(line, ":", 2)
 	if len(frag) == 2 {
 		sel, content := frag[0], strings.TrimSpace(frag[1])
@@ -72,14 +68,14 @@ func parseRecord(s *status, line string) state {
 				log.Printf("Date not understood: %s\n%s\n", content, err)
 				return parseRecord
 			}
-			s.time = t
+			s.entry.EventTime = t
 		case sel == "tags":
 			frags := strings.Split(content, ",")
 			tags := make([]string, len(frags))
 			for i := 0; i < len(frags); i++ {
 				tags[i] = strings.TrimSpace(frags[i])
 			}
-			s.tags = tags
+			s.entry.Tags = tags
 		case sel == "text":
 			return parseText(s, content)
 		default:
@@ -87,9 +83,10 @@ func parseRecord(s *status, line string) state {
 		}
 		return parseRecord
 	} else if line == "}" {
-		newrec := diary.Record{EventTime: s.time, Tags: s.tags, Text: s.text}
-		(&(s.diar)).AddEntry(newrec)
+		(&(s.diar)).AddEntry(s.entry)
+		s.entry = diary.Record{}
 		s.dirty = true
+		log.Println("New record added to diary")
 		return parseTop
 	} else {
 		log.Printf("Unexpected input while buildging record: %s\n", line)

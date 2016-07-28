@@ -13,12 +13,11 @@ import (
 )
 
 type status struct {
-	text     string
-	time     time.Time
-	tags     []string
-	filename string
-	diar     diary.Diary
-	dirty    bool
+	text   string
+	time   time.Time
+	tags   []string
+	diar   diary.Diary
+	dirty  bool
 }
 
 type state func(s *status, line string) state
@@ -30,16 +29,6 @@ func parseTop(s *status, line string) state {
 	} else if line == "new {" || line == "new{" {
 		return parseRecord
 	} else if line == "exit" || line == "quit" {
-		if s.dirty {
-			err := diary.Write(s.filename, s.diar)
-			if err != nil {
-				log.Println(err)
-				return parseTop
-			}
-			log.Println("Wrote records")
-			return nil
-		}
-		log.Println("Unmodified, not saving")
 		return nil
 	}
 	diaryCopy := s.diar
@@ -108,6 +97,22 @@ func parseRecord(s *status, line string) state {
 	}
 }
 
+func parseLines(scanner *bufio.Scanner, reqs diary.Diary) (*status, error) {
+	parse := parseTop
+	s := status{diar: reqs}
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		parse = parse(&s, line)
+		if parse == nil {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 func main() {
 	var reqs diary.Diary
 	var filename string
@@ -117,10 +122,15 @@ func main() {
 	} else {
 		filename = os.Args[1]
 		var err error
-		reqs, err = diary.Read(filename)
+		_, err = os.Stat(filename)
 		if err != nil {
 			log.Fatal(err)
 		}
+		f, err := os.Open(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		reqs, err = diary.Read(f)
 	}
 
 	if len(reqs) > 0 {
@@ -134,18 +144,27 @@ func main() {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	parse := parseTop
-	s := status{diar: reqs, filename: filename}
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		parse = parse(&s, line)
-		if parse == nil {
-			break
+	status, err := parseLines(scanner, reqs)
+	if err != nil {
+		log.Fatalf("Error reading input lines: %s", err.Error())
+	}
+	if status.dirty {
+		f, err := os.Open(filename)
+		if err != nil {
+			log.Fatalf("Error opening file for output: %s", err.Error())
 		}
+		err = diary.Write(f, status.diar)
+		if err != nil {
+			log.Fatalf("Error writing diary to file: %s", err.Error())
+		}
+		err = f.Close()
+		if err != nil {
+			log.Fatalf("Error closing output file: %s", err.Error())
+		}
+	} else {
+		log.Println("Diary not modified, nothing to write out")
 	}
-	if err := scanner.Err(); err != nil {
-		log.Println("reading standard input:", err)
-	}
+	os.Exit(0)
 }
 
 type funcCells struct {

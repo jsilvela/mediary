@@ -149,7 +149,8 @@ func main() {
 		var f *os.File
 		_, err := os.Stat(filename)
 		if err != nil {
-			log.Println("Output file didn't exist. Will create it.", err)
+			log.Printf("Output file not found: %s\nWill create it.",
+				filename)
 			f, err = os.Create(filename)
 			if err != nil {
 				log.Fatalf("Error creating output file: %s", err.Error())

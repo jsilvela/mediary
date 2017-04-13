@@ -15,7 +15,7 @@ Mediary reads from stdin and is line-oriented.
 
 The syntax can be represented like so:
 
-![para syntax](https://raw.githubusercontent.com/jsilvela/mediary/master/diag.svg)
+<img src="diag.svg" alt="para syntax">
 
 You start a new record by typing<br/>
 ```new {``` or ```new{```<br/>
